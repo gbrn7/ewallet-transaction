@@ -22,7 +22,7 @@ func (r *TransactionRepo) GetTransactionByReference(ctx context.Context, referen
 	)
 	sql := r.DB.Where("reference = ?", reference)
 	if !includeRefund {
-		sql = sql.Where("transactions_type != ?", constants.TransactionTypeRefund)
+		sql = sql.Where("transaction_type != ?", constants.TransactionTypeRefund)
 	}
 	err := sql.Last(&resp).Error
 
