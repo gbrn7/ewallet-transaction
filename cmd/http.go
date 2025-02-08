@@ -22,6 +22,8 @@ func ServeHttp() {
 	transactionV1 := r.Group("/transaction/v1")
 	transactionV1.POST("/create", d.MiddlewareValidateToken, d.TransactionAPI.CreateTransaction)
 	transactionV1.PUT("/update-status/:reference", d.MiddlewareValidateToken, d.TransactionAPI.UpdateStatusTransaction)
+	transactionV1.GET("/", d.MiddlewareValidateToken, d.TransactionAPI.GetTransaction)
+	transactionV1.GET("/:reference", d.MiddlewareValidateToken, d.TransactionAPI.GetTransactionDetail)
 
 	err := r.Run(":" + helpers.GetEnv("PORT", ""))
 	if err != nil {
