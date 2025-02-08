@@ -1,0 +1,21 @@
+syntax = "proto3";
+
+package notification;
+
+option go_package = "./notification";
+
+//TheNotificationservicedefinition
+ service NotificationService{
+ //Sendanotificationusingatemplate
+    rpc SendNotification(SendNotificationRequest) returns (SendNotificationResponse);
+ }
+ //Therequestmessagecontainingnotificationdetails
+ message SendNotificationRequest{
+  string template_name = 1; //TheIDof thetemplatetobeused
+  string recipient = 2; //Therecipient'scontact(email,phonenumber,or deviceID)
+  map<string,string> placeholders = 3; //A map of placeholder storep lace in thetemplatebody(e.g.,{{username}}->"John")
+ }
+ //Theresponsemessageafterattemptingtosendthenotification
+ message SendNotificationResponse{
+    string message = 1; //Amessageindicatingsuccessorfailure
+ }
