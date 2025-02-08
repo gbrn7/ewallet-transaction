@@ -1,5 +1,7 @@
 package constants
 
+import "time"
+
 const (
 	SuccessMessage      = "success"
 	ErrFailedBadRequest = "Data tidak sesuai"
@@ -24,3 +26,18 @@ var MapTransactionType = map[string]bool{
 	TransactionTypePurchase: true,
 	TransactionTypeRefund:   true,
 }
+
+// PENDING -> SUCCESS
+// PENDING -> FAILED
+
+//SUCCESS -> REVERSED
+
+var MapTransactionStatusFlow = map[string][]string{
+	TransactionStatusPending: {TransactionStatusSuccess, TransactionStatusFailed},
+	TransactionStatusSuccess: {TransactionStatusReversed},
+	TransactionStatusFailed:  {TransactionStatusSuccess},
+}
+
+const (
+	MaximumReversalDuration = time.Hour * 24
+)

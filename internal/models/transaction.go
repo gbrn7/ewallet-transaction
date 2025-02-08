@@ -32,3 +32,14 @@ type CreateTransactionResponse struct {
 	Reference         string `json:"reference"`
 	TransactionStatus string `json:"transaction_status"`
 }
+
+type UpdateStatusTransaction struct {
+	Reference         string `json:"reference" valid:"required"`
+	TransactionStatus string `json:"transaction_status" valid:"required"`
+	AdditionalInfo    string `json:"additional_info"`
+}
+
+func (l UpdateStatusTransaction) Validate() error {
+	v := validator.New()
+	return v.Struct(l)
+}
