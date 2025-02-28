@@ -1,22 +1,16 @@
-package repository
+package transaction
 
 import (
 	"context"
 	"ewallet-transaction/constants"
 	"ewallet-transaction/internal/models"
-
-	"gorm.io/gorm"
 )
 
-type TransactionRepo struct {
-	DB *gorm.DB
-}
-
-func (r *TransactionRepo) CreateTransaction(ctx context.Context, trx *models.Transaction) error {
+func (r *repository) CreateTransaction(ctx context.Context, trx *models.Transaction) error {
 	return r.DB.Create(trx).Error
 }
 
-func (r *TransactionRepo) GetTransactionByReference(ctx context.Context, reference string, includeRefund bool) (models.Transaction, error) {
+func (r *repository) GetTransactionByReference(ctx context.Context, reference string, includeRefund bool) (models.Transaction, error) {
 	var (
 		resp models.Transaction
 	)
@@ -29,11 +23,11 @@ func (r *TransactionRepo) GetTransactionByReference(ctx context.Context, referen
 	return resp, err
 }
 
-func (r *TransactionRepo) UpdateStatusTransaction(ctx context.Context, reference string, status string, additionalInfo string) error {
+func (r *repository) UpdateStatusTransaction(ctx context.Context, reference string, status string, additionalInfo string) error {
 	return r.DB.Exec("UPDATE transactions SET transaction_status = ?, additional_info = ? WHERE reference = ?", status, additionalInfo, reference).Error
 }
 
-func (r *TransactionRepo) GetTransaction(ctx context.Context, userID uint64) ([]models.Transaction, error) {
+func (r *repository) GetTransaction(ctx context.Context, userID uint64) ([]models.Transaction, error) {
 	var (
 		resp []models.Transaction
 	)

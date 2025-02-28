@@ -5,8 +5,9 @@ import (
 	"ewallet-transaction/helpers"
 	"ewallet-transaction/internal/api"
 	"ewallet-transaction/internal/interfaces"
-	"ewallet-transaction/internal/repository"
+	transactionRepo "ewallet-transaction/internal/repository/transaction"
 	"ewallet-transaction/internal/services"
+	transactionSvc "ewallet-transaction/internal/services/transaction"
 	"log"
 
 	"github.com/gin-gonic/gin"
@@ -46,14 +47,9 @@ func dependencyInject() Dependency {
 
 	external := &external.External{}
 
-	transactionRepo := &repository.TransactionRepo{
-		DB: helpers.DB,
-	}
+	transactionRepo := transactionRepo.NewRepository(helpers.DB)
 
-	transactionSvc := &services.TransactionService{
-		TransactionRepo: transactionRepo,
-		External:        external,
-	}
+	transactionSvc := transactionSvc.NewService(transactionRepo, external)
 
 	transactionAPI := &api.TransactionAPI{
 		TransactionService: transactionSvc,

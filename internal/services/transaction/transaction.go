@@ -1,4 +1,4 @@
-package services
+package transaction
 
 import (
 	"context"
@@ -6,7 +6,6 @@ import (
 	"ewallet-transaction/constants"
 	"ewallet-transaction/external"
 	"ewallet-transaction/helpers"
-	"ewallet-transaction/internal/interfaces"
 	"ewallet-transaction/internal/models"
 	"fmt"
 	"time"
@@ -14,12 +13,7 @@ import (
 	"github.com/pkg/errors"
 )
 
-type TransactionService struct {
-	TransactionRepo interfaces.ITransactionRepo
-	External        interfaces.IExternal
-}
-
-func (s *TransactionService) CreateTransaction(ctx context.Context, req *models.Transaction) (models.CreateTransactionResponse, error) {
+func (s *service) CreateTransaction(ctx context.Context, req *models.Transaction) (models.CreateTransactionResponse, error) {
 	var (
 		resp models.CreateTransactionResponse
 	)
@@ -35,7 +29,7 @@ func (s *TransactionService) CreateTransaction(ctx context.Context, req *models.
 		}
 	}
 
-	err := s.TransactionRepo.CreateTransaction(ctx, req)
+	err := s.repository.CreateTransaction(ctx, req)
 	if err != nil {
 		return resp, errors.Wrap(err, "failed to create transaction")
 	}
@@ -45,9 +39,9 @@ func (s *TransactionService) CreateTransaction(ctx context.Context, req *models.
 	return resp, nil
 }
 
-func (s *TransactionService) UpdateStatusTransaction(ctx context.Context, tokenData models.TokenData, req *models.UpdateStatusTransaction) error {
+func (s *service) UpdateStatusTransaction(ctx context.Context, tokenData models.TokenData, req *models.UpdateStatusTransaction) error {
 	// get transaction by reference
-	trx, err := s.TransactionRepo.GetTransactionByReference(ctx, req.Reference, false)
+	trx, err := s.repository.GetTransactionByReference(ctx, req.Reference, false)
 	if err != nil {
 		return errors.Wrap(err, "failed to get transaction")
 	}
@@ -85,15 +79,15 @@ func (s *TransactionService) UpdateStatusTransaction(ctx context.Context, tokenD
 	switch trx.TransactionType {
 	case constants.TransactionTypeTopup:
 		if req.TransactionStatus == constants.TransactionStatusSuccess {
-			_, errUpdateBalance = s.External.CreditBalance(ctx, tokenData.Token, reqUpdateBalance)
+			_, errUpdateBalance = s.external.CreditBalance(ctx, tokenData.Token, reqUpdateBalance)
 		} else if req.TransactionStatus == constants.TransactionStatusReversed {
-			_, errUpdateBalance = s.External.DebitBalance(ctx, tokenData.Token, reqUpdateBalance)
+			_, errUpdateBalance = s.external.DebitBalance(ctx, tokenData.Token, reqUpdateBalance)
 		}
 	case constants.TransactionTypePurchase:
 		if req.TransactionStatus == constants.TransactionStatusSuccess {
-			_, errUpdateBalance = s.External.DebitBalance(ctx, tokenData.Token, reqUpdateBalance)
+			_, errUpdateBalance = s.external.DebitBalance(ctx, tokenData.Token, reqUpdateBalance)
 		} else if req.TransactionStatus == constants.TransactionStatusReversed {
-			_, errUpdateBalance = s.External.CreditBalance(ctx, tokenData.Token, reqUpdateBalance)
+			_, errUpdateBalance = s.external.CreditBalance(ctx, tokenData.Token, reqUpdateBalance)
 		}
 	}
 
@@ -131,7 +125,7 @@ func (s *TransactionService) UpdateStatusTransaction(ctx context.Context, tokenD
 	}
 
 	// Update status in DB
-	err = s.TransactionRepo.UpdateStatusTransaction(ctx, req.Reference, req.TransactionStatus, string(byteAdditionalInfo))
+	err = s.repository.UpdateStatusTransaction(ctx, req.Reference, req.TransactionStatus, string(byteAdditionalInfo))
 	if err != nil {
 		return errors.Wrap(err, "failed to update status transaction")
 	}
@@ -142,27 +136,31 @@ func (s *TransactionService) UpdateStatusTransaction(ctx context.Context, tokenD
 	return nil
 }
 
-func (s *TransactionService) GetTransactionDetail(ctx context.Context, reference string) (models.Transaction, error) {
-	return s.TransactionRepo.GetTransactionByReference(ctx, reference, true)
+func (s *service) GetTransactionDetail(ctx context.Context, reference string) (models.Transaction, error) {
+	return s.repository.GetTransactionByReference(ctx, reference, true)
 }
 
-func (s *TransactionService) GetTransaction(ctx context.Context, userID uint64) ([]models.Transaction, error) {
-	return s.TransactionRepo.GetTransaction(ctx, userID)
+func (s *service) GetTransaction(ctx context.Context, userID uint64) ([]models.Transaction, error) {
+	return s.repository.GetTransaction(ctx, userID)
 }
 
-func (s *TransactionService) RefundTransaction(ctx context.Context, tokenData models.TokenData, req *models.RefundTransaction) (models.CreateTransactionResponse, error) {
+func (s *service) RefundTransaction(ctx context.Context, tokenData models.TokenData, req *models.RefundTransaction) (models.CreateTransactionResponse, error) {
 
 	var (
 		resp models.CreateTransactionResponse
 	)
 
-	trx, err := s.TransactionRepo.GetTransactionByReference(ctx, req.Reference, false)
+	trx, err := s.repository.GetTransactionByReference(ctx, req.Reference, false)
 	if err != nil {
 		return resp, errors.Wrap(err, "failed to get transaction")
 	}
 
-	if trx.TransactionStatus != constants.TransactionStatusSuccess && trx.TransactionType != constants.TransactionTypePurchase {
+	if trx.TransactionStatus != constants.TransactionStatusSuccess {
 		return resp, errors.New("current transaction status is not success")
+	}
+
+	if trx.TransactionType != constants.TransactionTypePurchase {
+		return resp, errors.New("current transaction status is not purchase type")
 	}
 
 	refundReference := "REFUND-" + req.Reference
@@ -171,7 +169,7 @@ func (s *TransactionService) RefundTransaction(ctx context.Context, tokenData mo
 		Amount:    trx.Amount,
 	}
 
-	_, err = s.External.CreditBalance(ctx, tokenData.Token, reqCreditBalance)
+	_, err = s.external.CreditBalance(ctx, tokenData.Token, reqCreditBalance)
 	if err != nil {
 		return resp, errors.Wrap(err, "failed to credit balance")
 	}
@@ -182,10 +180,11 @@ func (s *TransactionService) RefundTransaction(ctx context.Context, tokenData mo
 		TransactionType:   constants.TransactionTypeRefund,
 		TransactionStatus: constants.TransactionStatusSuccess,
 		Reference:         refundReference,
+		Description:       req.Description,
 		AdditionalInfo:    req.AdditionalInfo,
 	}
 
-	err = s.TransactionRepo.CreateTransaction(ctx, &transaction)
+	err = s.repository.CreateTransaction(ctx, &transaction)
 	if err != nil {
 		return resp, errors.Wrap(err, "failed to insert new transaction refund")
 	}
@@ -196,10 +195,10 @@ func (s *TransactionService) RefundTransaction(ctx context.Context, tokenData mo
 	return resp, nil
 }
 
-func (s *TransactionService) sendNotification(ctx context.Context, tokenData models.TokenData, trx models.Transaction) {
+func (s *service) sendNotification(ctx context.Context, tokenData models.TokenData, trx models.Transaction) {
 	if trx.TransactionType == constants.TransactionTypePurchase && trx.TransactionStatus == constants.TransactionStatusSuccess {
 
-		s.External.SendNotification(ctx, tokenData.Email, "purchase_success", map[string]string{
+		s.external.SendNotification(ctx, tokenData.Email, "purchase_success", map[string]string{
 			"full_name":   tokenData.Fullname,
 			"description": trx.Description,
 			"reference":   trx.Reference,
