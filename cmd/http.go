@@ -3,61 +3,41 @@ package cmd
 import (
 	"ewallet-transaction/external"
 	"ewallet-transaction/helpers"
-	"ewallet-transaction/internal/api"
-	"ewallet-transaction/internal/interfaces"
+	healthcheckHandler "ewallet-transaction/internal/handler/healthcheck"
+	transactionHandler "ewallet-transaction/internal/handler/transaction"
+	healthcheckRepo "ewallet-transaction/internal/repository/healthcheck"
 	transactionRepo "ewallet-transaction/internal/repository/transaction"
-	"ewallet-transaction/internal/services"
+	healthcheckSvc "ewallet-transaction/internal/services/healthcheck"
 	transactionSvc "ewallet-transaction/internal/services/transaction"
+	"ewallet-transaction/middleware"
 	"log"
 
 	"github.com/gin-gonic/gin"
 )
 
 func ServeHttp() {
-	d := dependencyInject()
-
 	r := gin.Default()
 
-	r.GET("/health", d.HealthcheckAPI.HealthcheckHandlerHTTP)
+	healthcheckRepo := healthcheckRepo.NewRepository()
 
-	transactionV1 := r.Group("/transaction/v1")
-	transactionV1.POST("/create", d.MiddlewareValidateToken, d.TransactionAPI.CreateTransaction)
-	transactionV1.PUT("/update-status/:reference", d.MiddlewareValidateToken, d.TransactionAPI.UpdateStatusTransaction)
-	transactionV1.GET("/", d.MiddlewareValidateToken, d.TransactionAPI.GetTransaction)
-	transactionV1.GET("/:reference", d.MiddlewareValidateToken, d.TransactionAPI.GetTransactionDetail)
-	transactionV1.POST("/refund", d.MiddlewareValidateToken, d.TransactionAPI.RefundTransaction)
+	healthcheckSvc := healthcheckSvc.NewService(healthcheckRepo)
+
+	external := &external.External{}
+
+	middleware := &middleware.ExternalDependency{
+		External: external,
+	}
+
+	transactionRepo := transactionRepo.NewRepository(helpers.DB)
+	transactionSvc := transactionSvc.NewService(transactionRepo, external)
+	transactionHandler := transactionHandler.NewHandler(r, transactionSvc, external, middleware)
+	transactionHandler.RegisterRoute()
+
+	healthcheckHandler := healthcheckHandler.NewHandler(r, healthcheckSvc)
+	healthcheckHandler.RegisterRoute()
 
 	err := r.Run(":" + helpers.GetEnv("PORT", ""))
 	if err != nil {
 		log.Fatal(err)
-	}
-}
-
-type Dependency struct {
-	HealthcheckAPI interfaces.IHealthcheckAPI
-	External       interfaces.IExternal
-	TransactionAPI interfaces.ITransactionAPI
-}
-
-func dependencyInject() Dependency {
-	healthcheckSvc := &services.Healthcheck{}
-	healthcheckAPI := &api.Healthcheck{
-		HealthcheckServices: healthcheckSvc,
-	}
-
-	external := &external.External{}
-
-	transactionRepo := transactionRepo.NewRepository(helpers.DB)
-
-	transactionSvc := transactionSvc.NewService(transactionRepo, external)
-
-	transactionAPI := &api.TransactionAPI{
-		TransactionService: transactionSvc,
-	}
-
-	return Dependency{
-		HealthcheckAPI: healthcheckAPI,
-		TransactionAPI: transactionAPI,
-		External:       external,
 	}
 }

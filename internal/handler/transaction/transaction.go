@@ -1,62 +1,57 @@
-package api
+package transaction
 
 import (
 	"ewallet-transaction/constants"
 	"ewallet-transaction/helpers"
-	"ewallet-transaction/internal/interfaces"
 	"ewallet-transaction/internal/models"
+	"fmt"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
 )
 
-type TransactionAPI struct {
-	TransactionService interfaces.ITransactionService
-}
-
-func (api *TransactionAPI) CreateTransaction(c *gin.Context) {
+func (h *Handler) CreateTransaction(c *gin.Context) {
 	var (
-		log = helpers.Logger
 		req models.Transaction
 	)
 
 	if err := c.ShouldBindJSON(&req); err != nil {
-		log.Error("failed to parse request, ", err)
+		fmt.Println("failed to parse request, ", err)
 		helpers.SendResponseHTTP(c, http.StatusBadRequest, constants.ErrFailedBadRequest, nil)
 		return
 	}
 
 	if err := req.Validate(); err != nil {
-		log.Error("failed to validate request, ", err)
+		fmt.Println("failed to validate request, ", err)
 		helpers.SendResponseHTTP(c, http.StatusBadRequest, constants.ErrFailedBadRequest, nil)
 		return
 	}
 
 	token, ok := c.Get("token")
 	if !ok {
-		log.Error("failed to get token data")
+		fmt.Println("failed to get token data")
 		helpers.SendResponseHTTP(c, http.StatusInternalServerError, constants.ErrServerError, nil)
 		return
 	}
 
 	tokenData, ok := token.(models.TokenData)
 	if !ok {
-		log.Error("failed to parse token data")
+		fmt.Println("failed to parse token data")
 		helpers.SendResponseHTTP(c, http.StatusInternalServerError, constants.ErrServerError, nil)
 		return
 	}
 
 	if !constants.MapTransactionType[req.TransactionType] {
-		log.Error("invalid transaction type")
+		fmt.Println("invalid transaction type")
 		helpers.SendResponseHTTP(c, http.StatusBadRequest, constants.ErrFailedBadRequest, nil)
 		return
 	}
 
 	req.UserID = tokenData.UserID
 
-	resp, err := api.TransactionService.CreateTransaction(c.Request.Context(), &req)
+	resp, err := h.Service.CreateTransaction(c.Request.Context(), &req)
 	if err != nil {
-		log.Error("failed to create transaction, ", err)
+		fmt.Println("failed to create transaction, ", err)
 		helpers.SendResponseHTTP(c, http.StatusInternalServerError, constants.ErrServerError, nil)
 		return
 	}
@@ -64,43 +59,42 @@ func (api *TransactionAPI) CreateTransaction(c *gin.Context) {
 	helpers.SendResponseHTTP(c, http.StatusOK, constants.SuccessMessage, resp)
 }
 
-func (api *TransactionAPI) UpdateStatusTransaction(c *gin.Context) {
+func (h *Handler) UpdateStatusTransaction(c *gin.Context) {
 	var (
-		log = helpers.Logger
 		req models.UpdateStatusTransaction
 	)
 
 	if err := c.ShouldBindJSON(&req); err != nil {
-		log.Error("failed to parse request, ", err)
+		fmt.Println("failed to parse request, ", err)
 		helpers.SendResponseHTTP(c, http.StatusBadRequest, constants.ErrFailedBadRequest, nil)
 		return
 	}
 
 	req.Reference = c.Param("reference")
 	if err := req.Validate(); err != nil {
-		log.Error("failed to validate request, ", err)
+		fmt.Println("failed to validate request, ", err)
 		helpers.SendResponseHTTP(c, http.StatusBadRequest, constants.ErrFailedBadRequest, nil)
 		return
 	}
 
 	token, ok := c.Get("token")
 	if !ok {
-		log.Error("failed to get token data")
+		fmt.Println("failed to get token data")
 		helpers.SendResponseHTTP(c, http.StatusInternalServerError, constants.ErrServerError, nil)
 		return
 	}
 
 	tokenData, ok := token.(models.TokenData)
 	if !ok {
-		log.Error("failed to parse token data")
+		fmt.Println("failed to parse token data")
 		helpers.SendResponseHTTP(c, http.StatusInternalServerError, constants.ErrServerError, nil)
 		return
 	}
 
-	err := api.TransactionService.UpdateStatusTransaction(c.Request.Context(), tokenData, &req)
+	err := h.Service.UpdateStatusTransaction(c.Request.Context(), tokenData, &req)
 
 	if err != nil {
-		log.Error("failed to update transaction, ", err)
+		fmt.Println("failed to update transaction, ", err)
 		helpers.SendResponseHTTP(c, http.StatusInternalServerError, constants.ErrServerError, nil)
 		return
 	}
@@ -108,29 +102,26 @@ func (api *TransactionAPI) UpdateStatusTransaction(c *gin.Context) {
 	helpers.SendResponseHTTP(c, http.StatusOK, constants.SuccessMessage, nil)
 }
 
-func (api *TransactionAPI) GetTransaction(c *gin.Context) {
-	var (
-		log = helpers.Logger
-	)
+func (h *Handler) GetTransaction(c *gin.Context) {
 
 	token, ok := c.Get("token")
 	if !ok {
-		log.Error("failed to get token data")
+		fmt.Println("failed to get token data")
 		helpers.SendResponseHTTP(c, http.StatusInternalServerError, constants.ErrServerError, nil)
 		return
 	}
 
 	tokenData, ok := token.(models.TokenData)
 	if !ok {
-		log.Error("failed to parse token data")
+		fmt.Println("failed to parse token data")
 		helpers.SendResponseHTTP(c, http.StatusInternalServerError, constants.ErrServerError, nil)
 		return
 	}
 
-	resp, err := api.TransactionService.GetTransaction(c.Request.Context(), uint64(tokenData.UserID))
+	resp, err := h.Service.GetTransaction(c.Request.Context(), uint64(tokenData.UserID))
 
 	if err != nil {
-		log.Error("failed to update transaction, ", err)
+		fmt.Println("failed to update transaction, ", err)
 		helpers.SendResponseHTTP(c, http.StatusInternalServerError, constants.ErrServerError, nil)
 		return
 	}
@@ -138,35 +129,32 @@ func (api *TransactionAPI) GetTransaction(c *gin.Context) {
 	helpers.SendResponseHTTP(c, http.StatusOK, constants.SuccessMessage, resp)
 }
 
-func (api *TransactionAPI) GetTransactionDetail(c *gin.Context) {
-	var (
-		log = helpers.Logger
-	)
+func (h *Handler) GetTransactionDetail(c *gin.Context) {
 
 	reference := c.Param("reference")
 	if reference == "" {
-		log.Error("failed to get reference")
+		fmt.Println("failed to get reference")
 		helpers.SendResponseHTTP(c, http.StatusBadRequest, constants.ErrFailedBadRequest, nil)
 	}
 
 	token, ok := c.Get("token")
 	if !ok {
-		log.Error("failed to get token data")
+		fmt.Println("failed to get token data")
 		helpers.SendResponseHTTP(c, http.StatusInternalServerError, constants.ErrServerError, nil)
 		return
 	}
 
 	_, ok = token.(models.TokenData)
 	if !ok {
-		log.Error("failed to parse token data")
+		fmt.Println("failed to parse token data")
 		helpers.SendResponseHTTP(c, http.StatusInternalServerError, constants.ErrServerError, nil)
 		return
 	}
 
-	resp, err := api.TransactionService.GetTransactionDetail(c.Request.Context(), reference)
+	resp, err := h.Service.GetTransactionDetail(c.Request.Context(), reference)
 
 	if err != nil {
-		log.Error("failed to update transaction, ", err)
+		fmt.Println("failed to update transaction, ", err)
 		helpers.SendResponseHTTP(c, http.StatusInternalServerError, constants.ErrServerError, nil)
 		return
 	}
@@ -174,41 +162,40 @@ func (api *TransactionAPI) GetTransactionDetail(c *gin.Context) {
 	helpers.SendResponseHTTP(c, http.StatusOK, constants.SuccessMessage, resp)
 }
 
-func (api *TransactionAPI) RefundTransaction(c *gin.Context) {
+func (h *Handler) RefundTransaction(c *gin.Context) {
 	var (
-		log = helpers.Logger
 		req models.RefundTransaction
 	)
 
 	if err := c.ShouldBindJSON(&req); err != nil {
-		log.Error("failed to parse request, ", err)
+		fmt.Println("failed to parse request, ", err)
 		helpers.SendResponseHTTP(c, http.StatusBadRequest, constants.ErrFailedBadRequest, nil)
 		return
 	}
 
 	if err := req.Validate(); err != nil {
-		log.Error("failed to validate request, ", err)
+		fmt.Println("failed to validate request, ", err)
 		helpers.SendResponseHTTP(c, http.StatusBadRequest, constants.ErrFailedBadRequest, nil)
 		return
 	}
 
 	token, ok := c.Get("token")
 	if !ok {
-		log.Error("failed to get token data")
+		fmt.Println("failed to get token data")
 		helpers.SendResponseHTTP(c, http.StatusInternalServerError, constants.ErrServerError, nil)
 		return
 	}
 
 	tokenData, ok := token.(models.TokenData)
 	if !ok {
-		log.Error("failed to parse token data")
+		fmt.Println("failed to parse token data")
 		helpers.SendResponseHTTP(c, http.StatusInternalServerError, constants.ErrServerError, nil)
 		return
 	}
 
-	resp, err := api.TransactionService.RefundTransaction(c.Request.Context(), tokenData, &req)
+	resp, err := h.Service.RefundTransaction(c.Request.Context(), tokenData, &req)
 	if err != nil {
-		log.Error("failed to refund transaction, ", err)
+		fmt.Println("failed to refund transaction, ", err)
 		helpers.SendResponseHTTP(c, http.StatusInternalServerError, constants.ErrServerError, nil)
 		return
 	}

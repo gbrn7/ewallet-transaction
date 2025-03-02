@@ -1,13 +1,18 @@
-package cmd
+package middleware
 
 import (
 	"ewallet-transaction/helpers"
+	"ewallet-transaction/internal/handler/transaction"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
 )
 
-func (d *Dependency) MiddlewareValidateToken(c *gin.Context) {
+type ExternalDependency struct {
+	External transaction.External
+}
+
+func (d *ExternalDependency) MiddlewareValidateToken(c *gin.Context) {
 	var (
 		log = helpers.Logger
 	)
